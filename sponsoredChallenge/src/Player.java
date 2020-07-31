@@ -93,24 +93,25 @@ class Player {
 		}
 
 		public double computeCellScore(Coord cell) {
+			Random random = new Random();
 
 			int enemy = game.getNearestEnemyNumber(cell);
 			int dist = game.getEnemyCoordDistance(enemy, cell);
-			
-			double distScore = (-1d / dist)*50d;
-			double exploreScore = game.isExplored(cell) ? 0 : 10;
 
-			double score = distScore + exploreScore;
+			double distScore = (-1d / dist) * 60d;
+			double exploreScore = game.isExplored(cell) ? 0 : 15d;
+			double randomScore = random.nextDouble()*0d;
+			double score = distScore + exploreScore + randomScore;
 
 			System.err.println("computeCellScore of x=" + cell.x + ",y=" + cell.y + " nearestEnemy = " + (enemy + 1)
-					+ ", dist=" + dist + ", distScore = " + distScore + ", exploreScore = " + exploreScore + ", score = " + score);
+					+ ", dist=" + dist + ", distScore = " + distScore + ", exploreScore = " + exploreScore
+					+ ", score = " + score);
 
 			return score;
 		}
 
 		public Direction computeBestMove() {
-			Random random = new Random();
-			List<Direction> mainPlayerPossibleDirections = this.game.mainPlayerPossibleDirections();
+			List<Direction> playerPossibleDirections = this.game.playerPossibleDirections();
 			Coord player = game.getPlayer();
 
 			Comparator<Direction> compa = new Comparator<Player.Direction>() {
@@ -129,10 +130,10 @@ class Player {
 				}
 			};
 
-			mainPlayerPossibleDirections.sort(compa);
-			System.err.println("sorted mainPlayerPossibleDirections : " + mainPlayerPossibleDirections);
+			playerPossibleDirections.sort(compa);
+			System.err.println("sorted mainPlayerPossibleDirections : " + playerPossibleDirections);
 
-			Direction bestMove = mainPlayerPossibleDirections.get(0);
+			Direction bestMove = playerPossibleDirections.get(0);
 
 			return bestMove;
 		}
@@ -154,7 +155,7 @@ class Player {
 		private Coord player;
 
 		private List<List<CellType>> cellTypeMap;
-		
+
 		private Set<Coord> exploredCoord;
 
 		public Game(int width, int height, int nbPlayer) {
@@ -175,7 +176,7 @@ class Player {
 					cellTypeMap.get(x).add(CellType.UNKNOWN);
 				}
 			}
-			
+
 			exploredCoord = new HashSet<>();
 
 			System.err.println("width = " + width);
@@ -191,7 +192,6 @@ class Player {
 		}
 
 		public void setPlayerPosition(int playerNumber, int x, int y) {
-//			System.err.println("position of " + playerNumber + " : x=" + x + " y=" + y);
 			if (playerNumber < 4) {
 				enemies.get(playerNumber).setPosition(x, y);
 				this.setCellType(x, y, CellType.PATH);
@@ -201,23 +201,23 @@ class Player {
 				this.setCellType(x, y - 1, up);
 				this.setCellType(x + 1, y, right);
 				this.setCellType(x, y + 1, down);
-				
+
 				exploredCoord.add(new Coord(player.x, player.y));
 			}
 		}
-		
+
 		public boolean isExplored(Coord coord) {
 			return exploredCoord.contains(coord);
 		}
 
 		public int getEnemyPlayerDistance(int enemyNumber) {
 			Coord enemy = enemies.get(enemyNumber);
-			return player.distance(enemy);
+			return player.distance(enemy, this);
 		}
 
 		public int getEnemyCoordDistance(int enemyNumber, Coord coord) {
 			Coord enemy = enemies.get(enemyNumber);
-			return coord.distance(enemy);
+			return coord.distance(enemy, this);
 		}
 
 		public Coord getPlayer() {
@@ -238,11 +238,19 @@ class Player {
 		}
 
 		public void setCellType(int x, int y, CellType cellType) {
-			if (x >= 0 && x < width && y >= 0 && y < height)
-				cellTypeMap.get(x).set(y, cellType);
+			if (x < 0)
+				x += width;
+			if (x >= width)
+				x -= width;
+			if (y < 0)
+				y += height;
+			if (y >= height)
+				y -= height;
+
+			cellTypeMap.get(x).set(y, cellType);
 		}
 
-		public List<Direction> mainPlayerPossibleDirections() {
+		public List<Direction> playerPossibleDirections() {
 			ArrayList<Direction> list = new ArrayList<>();
 
 			if (up == CellType.PATH)
@@ -310,8 +318,15 @@ class Player {
 			return y;
 		}
 
-		public int distance(Coord coord2) {
-			return Math.abs(coord2.x - x) + Math.abs(coord2.y - y);
+		public int distance(Coord coord2, Game game) {
+
+			// map is not a plane
+			int distX = Math.min(Math.min(Math.abs(coord2.x - x), Math.abs(coord2.x - x - game.width)),
+					Math.abs(x - coord2.x - game.width));
+			int distY = Math.min(Math.min(Math.abs(coord2.y - y), Math.abs(coord2.y - y - game.height)),
+					Math.abs(y - coord2.y - game.height));
+
+			return distX + distY;
 		}
 
 		@Override
@@ -345,8 +360,6 @@ class Player {
 		private Player getEnclosingInstance() {
 			return Player.this;
 		}
-		
-		
 
 	}
 
