@@ -55,12 +55,8 @@ class Player {
 			return this.code;
 		}
 
-		public int applyToX(int x) {
-			return x + xModifyer;
-		}
-
-		public int applyToY(int y) {
-			return y + yModifyer;
+		public Coord applyToCoord(Coord player) {
+			return program.new Coord(player.x + xModifyer, player.y + yModifyer);
 		}
 	}
 
@@ -96,38 +92,47 @@ class Player {
 			this.game = game;
 		}
 
+		public double computeCellScore(Coord cell) {
+
+			int enemy = game.getNearestEnemyNumber(cell);
+			int dist = game.getEnemyCoordDistance(enemy, cell);
+			
+			double distScore = (-1d / dist)*50d;
+			double exploreScore = game.isExplored(cell) ? 0 : 10;
+
+			double score = distScore + exploreScore;
+
+			System.err.println("computeCellScore of x=" + cell.x + ",y=" + cell.y + " nearestEnemy = " + (enemy + 1)
+					+ ", dist=" + dist + ", distScore = " + distScore + ", exploreScore = " + exploreScore + ", score = " + score);
+
+			return score;
+		}
+
 		public Direction computeBestMove() {
 			Random random = new Random();
 			List<Direction> mainPlayerPossibleDirections = this.game.mainPlayerPossibleDirections();
-			MovableEntity player = game.getPlayer();
-			int nearestEnemyNumber = game.getNearestEnemyNumber();
-//			int nearestEnemyNumber = 1 - 1;
+			Coord player = game.getPlayer();
 
-			System.err.println("nearest enemy = " + (nearestEnemyNumber+1));
-			
 			Comparator<Direction> compa = new Comparator<Player.Direction>() {
 				@Override
 				public int compare(Direction d1, Direction d2) {
-					int x1 = d1.applyToX(player.getX());
-					int y1 = d1.applyToY(player.getY());
-					int x2 = d2.applyToX(player.getX());
-					int y2 = d2.applyToY(player.getY());
-					
-					int dist1 = game.getEnemyCoordDistance(nearestEnemyNumber, x1, y1);
-					int dist2 = game.getEnemyCoordDistance(nearestEnemyNumber, x2, y2);
+					Coord coord1 = d1.applyToCoord(player);
+					Coord coord2 = d2.applyToCoord(player);
 
-					int comparison = dist2 - dist1;
-					System.err.println("comparison between "+d1+" and "+d2+" = " +comparison);
-					
+					double coord1Score = computeCellScore(coord1);
+					double coord2Score = computeCellScore(coord2);
+
+					int comparison = (int) (coord2Score - coord1Score);
+					System.err.println("comparison between " + d1 + " and " + d2 + " = " + comparison);
+
 					return comparison;
 				}
 			};
-			
+
 			mainPlayerPossibleDirections.sort(compa);
-			System.err.println("sorted mainPlayerPossibleDirections : "+mainPlayerPossibleDirections);
+			System.err.println("sorted mainPlayerPossibleDirections : " + mainPlayerPossibleDirections);
 
 			Direction bestMove = mainPlayerPossibleDirections.get(0);
-//			Direction bestMove = mainPlayerPossibleDirections.get(random.nextInt(mainPlayerPossibleDirections.size()));
 
 			return bestMove;
 		}
@@ -145,10 +150,12 @@ class Player {
 		private CellType down;
 		private CellType left;
 
-		private List<MovableEntity> enemies;
-		private MovableEntity player;
+		private List<Coord> enemies;
+		private Coord player;
 
 		private List<List<CellType>> cellTypeMap;
+		
+		private Set<Coord> exploredCoord;
 
 		public Game(int width, int height, int nbPlayer) {
 			this.width = width;
@@ -157,9 +164,9 @@ class Player {
 
 			enemies = new ArrayList<>();
 			for (int i = 0; i < nbPlayer - 1; i++) {
-				enemies.add(new MovableEntity());
+				enemies.add(new Coord());
 			}
-			player = new MovableEntity();
+			player = new Coord();
 
 			cellTypeMap = new ArrayList<>();
 			for (int x = 0; x < width; x++) {
@@ -168,6 +175,8 @@ class Player {
 					cellTypeMap.get(x).add(CellType.UNKNOWN);
 				}
 			}
+			
+			exploredCoord = new HashSet<>();
 
 			System.err.println("width = " + width);
 			System.err.println("height = " + height);
@@ -179,15 +188,10 @@ class Player {
 			this.right = CellType.fromCode(right);
 			this.down = CellType.fromCode(down);
 			this.left = CellType.fromCode(left);
-
-//			System.err.println("left = " + up);
-//			System.err.println("right = " + right);
-//			System.err.println("down = " + down);
-//			System.err.println("left = " + left);
 		}
 
 		public void setPlayerPosition(int playerNumber, int x, int y) {
-			System.err.println("position of " + playerNumber + " : x=" + x + " y=" + y);
+//			System.err.println("position of " + playerNumber + " : x=" + x + " y=" + y);
 			if (playerNumber < 4) {
 				enemies.get(playerNumber).setPosition(x, y);
 				this.setCellType(x, y, CellType.PATH);
@@ -197,31 +201,35 @@ class Player {
 				this.setCellType(x, y - 1, up);
 				this.setCellType(x + 1, y, right);
 				this.setCellType(x, y + 1, down);
+				
+				exploredCoord.add(new Coord(player.x, player.y));
 			}
+		}
+		
+		public boolean isExplored(Coord coord) {
+			return exploredCoord.contains(coord);
 		}
 
 		public int getEnemyPlayerDistance(int enemyNumber) {
-			MovableEntity enemy = enemies.get(enemyNumber);
-//			return Math.sqrt((enemy.getX()-player.getX()) + (enemy.getY()-player.getY()));
-			return Math.abs((enemy.getX() - player.getX())) + Math.abs((enemy.getY() - player.getY()));
+			Coord enemy = enemies.get(enemyNumber);
+			return player.distance(enemy);
 		}
 
-		public int getEnemyCoordDistance(int enemyNumber, int x, int y) {
-			MovableEntity enemy = enemies.get(enemyNumber);
-//			return Math.sqrt((enemy.getX()-x) + (enemy.getY()-y));
-			return Math.abs((enemy.getX() - x)) + Math.abs((enemy.getY() - y));
+		public int getEnemyCoordDistance(int enemyNumber, Coord coord) {
+			Coord enemy = enemies.get(enemyNumber);
+			return coord.distance(enemy);
 		}
 
-		public MovableEntity getPlayer() {
+		public Coord getPlayer() {
 			return player;
 		}
 
-		public int getNearestEnemyNumber() {
+		public int getNearestEnemyNumber(Coord coord) {
 			int nearestEnemyNumber = 1000;
 			int minDistance = 10000;
 			for (int num = 0; num < enemies.size(); num++) {
-				int enemyDistance = getEnemyPlayerDistance(num);
-				if (enemyDistance < (minDistance-2)) {
+				int enemyDistance = getEnemyCoordDistance(num, coord);
+				if (enemyDistance < minDistance) {
 					minDistance = enemyDistance;
 					nearestEnemyNumber = num;
 				}
@@ -276,12 +284,17 @@ class Player {
 		}
 	}
 
-	public class MovableEntity {
+	public class Coord {
 		int x;
 		int y;
 
-		public MovableEntity() {
+		public Coord() {
 
+		}
+
+		public Coord(int x, int y) {
+			this.x = x;
+			this.y = y;
 		}
 
 		public void setPosition(int x, int y) {
@@ -296,6 +309,44 @@ class Player {
 		public int getY() {
 			return y;
 		}
+
+		public int distance(Coord coord2) {
+			return Math.abs(coord2.x - x) + Math.abs(coord2.y - y);
+		}
+
+		@Override
+		public int hashCode() {
+			final int prime = 31;
+			int result = 1;
+			result = prime * result + getEnclosingInstance().hashCode();
+			result = prime * result + x;
+			result = prime * result + y;
+			return result;
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (this == obj)
+				return true;
+			if (obj == null)
+				return false;
+			if (getClass() != obj.getClass())
+				return false;
+			Coord other = (Coord) obj;
+			if (!getEnclosingInstance().equals(other.getEnclosingInstance()))
+				return false;
+			if (x != other.x)
+				return false;
+			if (y != other.y)
+				return false;
+			return true;
+		}
+
+		private Player getEnclosingInstance() {
+			return Player.this;
+		}
+		
+		
 
 	}
 
