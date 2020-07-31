@@ -1,12 +1,13 @@
-package sponsoredChallenge;
-
 import java.util.*;
+
+import javax.swing.text.Position;
+
 import java.io.*;
 import java.math.*;
 
-public class Program {
+class Player {
 
-	static Program program = new Program();
+	static Player program = new Player();
 
 	public static void main(String args[]) {
 		Scanner in = new Scanner(System.in);
@@ -28,16 +29,10 @@ public class Program {
 			for (int i = 0; i < nbPlayer; i++) {
 				int x = in.nextInt();
 				int y = in.nextInt();
-				System.err.println("x = " + x);
-				System.err.println("y = " + y);
+				game.setPlayerPosition(i, x, y);
 			}
 			in.nextLine();
-
-			// Write an action using System.out.println()
-			// To debug: System.err.println("Debug messages...");
-
-			// System.out.println("A, B, C, D or E");
-			System.out.println("A");
+			System.out.println(game.printBestMove());
 		}
 	}
 
@@ -45,8 +40,12 @@ public class Program {
 		UP("C"), RIGHT("A"), DOWN("D"), LEFT("E"), STAY("B");
 		private String code;
 
-		Direction(String Code) {
+		Direction(String code) {
 			this.code = code;
+		}
+
+		public String getCode() {
+			return this.code;
 		}
 	}
 
@@ -61,12 +60,17 @@ public class Program {
 		private String down;
 		private String left;
 		
-		private List<Player> players;
+		private List<MovableEntity> players;
 
 		public Game(int width, int height, int nbPlayer) {
 			this.width = width;
 			this.height = height;
 			this.nbPlayer = nbPlayer;
+			
+			players = new ArrayList<>();
+			for(int i=0 ; i<nbPlayer ; i++) {
+				players.add(new MovableEntity());
+			}
 
 			System.err.println("width = " + width);
 			System.err.println("height = " + height);
@@ -84,13 +88,25 @@ public class Program {
 			System.err.println("down = " + down);
 			System.err.println("left = " + left);
 		}
+		
+		public void setPlayerPosition(int playerNumber, int x, int y) {
+			System.err.println("x = " + x);
+			System.err.println("y = " + y);
+			players.get(playerNumber).setPosition(x, y);
+		}
+
+
+		public String printBestMove() {
+			return Direction.STAY.getCode();
+		}
+		
 	}
 	
-	class Player{
+	class MovableEntity{
 		int x;
 		int y;
 		
-		public Player() {
+		public MovableEntity() {
 			
 		}
 		public void setPosition(int x, int y) {
